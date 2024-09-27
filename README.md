@@ -75,7 +75,12 @@ services:
       REDIS_PORT: 6379                 # Port number where Redis is running (default 6379)
       REDIS_PASSWORD:                  # Password for Redis authentication (if required)
 
-      # Trakt API credentials
+      # These credentials are required to interact with the Trakt API and access its services.
+      # To obtain these credentials:
+      # 1. Create an account on Trakt.tv (https://trakt.tv).
+      # 2. Go to the applications section (https://trakt.tv/oauth/applications).
+      # 3. Create a new application by filling in the required information (name, description, etc.).
+      #    - For the "Redirect URL", use the following format: BASE_URL + /callback (e.g., http://localhost:7000/callback).
       TRAKT_CLIENT_ID:                 # Trakt client ID
       TRAKT_CLIENT_SECRET:             # Trakt client secret
 
