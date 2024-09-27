@@ -29,6 +29,11 @@ services:
       LOG_INTERVAL_DELETION: 3d
       NODE_ENV: production
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./cache:/usr/src/app/cache
       - ./log:/usr/src/app/log

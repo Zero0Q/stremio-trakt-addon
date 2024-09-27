@@ -5,15 +5,15 @@ This is a specialized addon for Stremio, integrating deeply with Trakt services 
 ## Features
 
 ### Content in your preferred language
-- Retrieve content in the language of your choice for a personalized experience.
+- Retrieve content in the language of your choice.
 
 ### Trakt catalog integration
-- Access **popular** and **trending** catalogs directly from Trakt.
+- Access **popular** and **trending** catalogs from Trakt.
 - View your **watchlist** and receive **personalized recommendations** from Trakt.
 
 ### List management
 - Add Trakt lists as catalogs by browsing through **popular**, **trending**, or **search** tabs on the addon configuration page.
-- Add lists directly by URL for custom catalog management.
+- Add lists directly by Trakt URL.
 
 ### RPDB integration
 - Integrate with RPDB, a web service providing posters and ratings for movies and series, enriching the visual and informational content of the catalogs.
