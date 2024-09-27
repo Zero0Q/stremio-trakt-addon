@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stremio Trakt Addon</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background-color: #f8f8f8;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+        overflow-y: auto;
+      }
+
+      .form-container {
+        background-color: white;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-width: 800px;
+        width: 90%;
+        margin: 20px auto;
+        height: auto;
+        overflow: visible;
+      }
+
+      h1 {
+        font-size: 28px;
+        color: #333;
+        margin-bottom: 30px;
+      }
+
+      .connect-btn {
+        display: inline-block;
+        padding: 12px 30px;
+        font-size: 16px;
+        font-weight: 600;
+        color: white;
+        background-color: #007aff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        margin-bottom: 20px;
+      }
+
+      .connect-btn:hover {
+        background-color: #005bb5;
+      }
+
+      .addListUrl-btn {
+        display: inline-block;
+        padding: 12px 30px;
+        font-size: 16px;
+        font-weight: 600;
+        color: white;
+        background-color: #007aff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+
+      .addListUrl-btn:hover {
+        background-color: #005bb5;
+      }
+
+      .tabs {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        flex: 1;
+        padding: 10px;
+        background-color: #f1f1f1;
+        cursor: pointer;
+        text-align: center;
+        margin: 5px;
+        border-radius: 5px;
+      }
+
+      .tab.active {
+        background-color: #007aff;
+        color: white;
+      }
+
+      .sub-tabs {
+        display: none;
+        justify-content: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .sub-tabs.active {
+        display: flex;
+      }
+
+      .sub-tab {
+        flex: 1;
+        padding: 10px;
+        background-color: #f1f1f1;
+        cursor: pointer;
+        text-align: center;
+        margin: 5px;
+        border-radius: 5px;
+      }
+
+      .sub-tab.active {
+        background-color: #007aff;
+        color: white;
+      }
+
+      .list-container {
+        display: none;
+        max-height: 600px;
+        overflow-y: auto;
+        padding: 10px;
+        border-radius: 8px;
+        background-color: white;
+        margin-bottom: 20px;
+        word-wrap: break-word;
+      }
+
+      .list-container.active {
+        display: block;
+      }
+
+      .list-item {
+        border: 1px solid #ddd;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        background-color: white;
+        transition: box-shadow 0.3s ease;
+      }
+
+      .list-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .list-header h4 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .list-header a {
+        color: #007aff;
+        text-decoration: none;
+      }
+
+      .list-header a:hover {
+        text-decoration: underline;
+      }
+
+      .add-list-btn {
+        background-color: #007aff;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+
+      .add-list-btn:hover {
+        background-color: #005bb5;
+      }
+
+      .list-item p {
+        text-align: left;
+        margin: 10px 0;
+      }
+
+      .list-info {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+
+      .list-info p {
+        margin: 5px 0;
+        flex: 1 1 45%;
+        text-align: left;
+      }
+
+      .search-container {
+        display: none;
+        margin-bottom: 20px;
+      }
+
+      .search-container.active {
+        display: block;
+      }
+
+      #searchInput {
+        padding: 10px;
+        width: calc(100% - 120px);
+        margin-right: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      #searchButton {
+        padding: 10px 20px;
+        background-color: #007aff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+
+      #searchButton:hover {
+        background-color: #005bb5;
+      }
+
+      .selected-lists {
+        margin-top: 20px;
+        border-top: 2px solid #ddd;
+        padding-top: 20px;
+        text-align: left;
+      }
+
+      .selected-lists h3 {
+        margin-bottom: 15px;
+      }
+
+      .selected-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: #f1f1f1;
+        border-radius: 5px;
+      }
+
+      .selected-item p {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .remove-btn {
+        color: #ff3b30;
+        cursor: pointer;
+        font-size: 20px;
+        border: none;
+        background: none;
+        padding: 0;
+      }
+
+      .remove-btn:hover {
+        color: #d32f2f;
+      }
+
+      .config-container {
+        margin-bottom: 20px;
+        text-align: left;
+      }
+
+      .config-label {
+        font-size: 18px;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+
+      .toggle-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+
+      .toggle-item {
+        display: flex;
+        align-items: center;
+        margin: 5px;
+      }
+
+      .toggle-item label {
+        margin-right: 10px;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 34px;
+        height: 20px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 12px;
+        width: 12px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+      }
+
+      input:checked+.slider {
+        background-color: #007aff;
+      }
+
+      input:checked+.slider:before {
+        transform: translateX(14px);
+      }
+
+      @media screen and (max-width: 768px) {
+        .form-container {
+          padding: 20px;
+          width: 100%;
+          margin: 10px auto;
+        }
+
+        h1 {
+          font-size: 24px;
+        }
+
+        .tabs,
+        .sub-tabs {
+          flex-direction: column;
+        }
+
+        .tab,
+        .sub-tab {
+          padding: 8px;
+        }
+
+        .list-container {
+          max-height: 300px;
+        }
+
+        .list-info p {
+          flex: 1 1 100%;
+        }
+
+        #searchInput {
+          width: 100%;
+          margin-bottom: 10px;
+        }
+
+        #searchButton {
+          width: 100%;
+        }
+      }
+
+      .selected-item.dragging {
+        opacity: 0.5;
+        background-color: #e0e0e0;
+      }
+
+      .api-input {
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      .toggle-item.long-label {
+        flex-wrap: wrap;
+      }
+
+      .toggle-item.long-label label {
+        flex: 1 1 100%;
+        margin-bottom: 5px;
+      }
+
+      .toggle-item.long-label .switch {
+        margin-left: 0;
+      }
+
+      .input-button-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .input-button-container .api-input {
+        flex: 1;
+        margin-right: 10px;
+      }
+
+      .input-button-container .connect-btn {
+        flex-shrink: 0;
+      }
+
+      .button-primary {
+        background-color: #007aff;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: 600;
+        transition: background-color 0.3s ease;
+      }
+
+      .button-primary:hover {
+        background-color: #005bb5;
+      }
+
+      .username-display {
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 20px;
+      }
+
+      .switch input:disabled+.slider {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      .switch input:disabled+.slider:before {
+        background-color: #999;
+      }
+
+      .dropdown-menu {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: white;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="form-container">
+      <h1>Stremio Trakt Addon (0.1.0)</h1>
+      <button id="connectTraktButton" class="connect-btn">Login to Trakt to enable all features</button>
+      <div class="tabs">
+        <div class="tab active" data-tab="configuration">Configuration</div>
+        <div class="tab" data-tab="lists">Lists</div>
+      </div>
+      <div class="sub-tabs">
+        <div class="sub-tab active" data-sub-tab="trending">Trending</div>
+        <div class="sub-tab" data-sub-tab="popular">Popular</div>
+        <div class="sub-tab" data-sub-tab="search">Search</div>
+      </div>
+      <div class="search-container" id="searchContainer">
+        <input type="text" id="searchInput" placeholder="Search lists..." />
+        <button id="searchButton">Search</button>
+      </div>
+      <div class="list-container" id="searchResults"></div>
+      <div class="list-container active" id="configuration">
+        <div class="config-container">
+          <div class="config-label">Adds catalog</div>
+          <div class="toggle-container">
+            <div class="toggle-item">
+              <label for="watchlistToggle">Watchlist</label>
+              <label class="switch">
+                <input type="checkbox" id="watchlistToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-item">
+              <label for="recommendationsToggle">Recommendations</label>
+              <label class="switch">
+                <input type="checkbox" id="recommendationsToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-item">
+              <label for="trendingToggle">Trending</label>
+              <label class="switch">
+                <input type="checkbox" id="trendingToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-item">
+              <label for="popularToggle">Popular</label>
+              <label class="switch">
+                <input type="checkbox" id="popularToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="config-label">Adds lists from URL</div>
+          <div class="input-button-container">
+            <input type="text" id="listUrlInput" placeholder="Enter list URL..." class="api-input">
+            <button id="addListFromUrlButton" class="addListUrl-btn">Add</button>
+          </div>
+          <div class="config-container">
+            <div class="config-label">Select Language</div>
+            <select id="languageSelect" class="dropdown-menu">
+              <option value="">Select your language</option>
+            </select>
+          </div>
+          <div class="config-container">
+            <div class="config-label">TMDB API Key (<a href="https://www.themoviedb.org/settings/api" target="_blank" style="color: #007aff;">Get it here</a>) </div>
+            <input type="text" id="tmdbApiKey" placeholder="Enter TMDB API key..." class="api-input">
+          </div>
+          <div class="config-container">
+            <div class="config-label">RPDB API key (<a href="https://ratingposterdb.com/api-key/" target="_blank" style="color: #007aff;">Get it here</a>) </div>
+            <input type="text" id="rpdbApiKey" placeholder="Enter RPDB API key..." class="api-input">
+          </div>
+          <div class="config-container">
+            <div class="config-label">Fanart API key (<a href="https://fanart.tv/get-an-api-key" target="_blank" style="color: #007aff;">Get it here</a>) </div>
+            <input type="text" id="fanartApiKey" placeholder="Enter Fanart API key..." class="api-input">
+          </div>
+          <div class="config-container">
+            <div class="config-label">Mark content history as viewed on catalogs (not ready)</div>
+            <div class="toggle-item">
+              <label class="switch">
+                <input type="checkbox" id="markContentHistoryToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="list-container" id="trendingLists"></div>
+      <div class="list-container" id="popularLists"></div>
+      <div class="selected-lists" id="selectedLists">
+        <h3>Selected lists</h3>
+        <div id="selectedContainer"></div>
+      </div>
+      <button id="copyLinkButton" class="connect-btn">Copy link</button>
+    </div>
+    <script src="/js/languages.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const traktUsername = urlParams.get('username');
+        if (traktUsername) {
+          const connectButton = document.getElementById('connectTraktButton');
+          connectButton.style.display = 'none';
+          const usernameDisplay = document.createElement('div');
+          usernameDisplay.id = 'traktUsername';
+          usernameDisplay.textContent = `Connected as: ${traktUsername}`;
+          usernameDisplay.classList.add('username-display');
+          connectButton.parentNode.replaceChild(usernameDisplay, connectButton);
+        } else {
+          const togglesToDisable = ['watchlistToggle', 'recommendationsToggle', 'markContentHistoryToggle'];
+          togglesToDisable.forEach(toggleId => {
+            const toggleElement = document.getElementById(toggleId);
+            toggleElement.disabled = true;
+            toggleElement.parentElement.addEventListener('click', () => {
+              alert('Please login to Trakt to enable this feature.');
+            });
+          });
+        }
+        fetch('/env').then(response => response.json()).then(env => {
+          document.getElementById('connectTraktButton').addEventListener('click', () => {
+            const clientId = env.TRAKT_CLIENT_ID;
+            const redirectUri = `${window.location.origin}/callback`;
+            const traktAuthUrl = `https://trakt.tv/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+            window.location.href = traktAuthUrl;
+          });
+        }).catch(error => console.error('Error fetching environment variables:', error));
+        const tabs = document.querySelectorAll('.tab');
+        const listContainers = document.querySelectorAll('.list-container');
+        const selectedContainer = document.getElementById('selectedContainer');
+        const subTabs = document.querySelectorAll('.sub-tab');
+        const subTabsContainer = document.querySelector('.sub-tabs');
+        const searchContainer = document.getElementById('searchContainer');
+        const searchButton = document.getElementById('searchButton');
+        const searchInput = document.getElementById('searchInput');
+        const searchResultsContainer = document.getElementById('searchResults');
+        let trendingPage = 1;
+        let popularPage = 1;
+        let searchPage = 1;
+        let trendingLoading = false;
+        let popularLoading = false;
+        let searchLoading = false;
+        let trendingHasMore = true;
+        let popularHasMore = true;
+        let searchHasMore = true;
+        let searchQuery = '';
+        searchButton.addEventListener('click', async () => {
+          const query = searchInput.value.trim();
+          if (query) {
+            searchPage = 1;
+            searchHasMore = true;
+            searchLoading = false;
+            searchQuery = query;
+            const searchResults = await fetchLists('search', query, searchPage);
+            if (searchResults.length < 10) {
+              searchHasMore = false;
+            }
+            renderLists(searchResults, 'searchResults');
+            searchResultsContainer.classList.add('active');
+            console.log("Search results are visible now.");
+          } else {
+            console.error("Le champ de recherche est vide");
+          }
+        });
+
+        function populateLanguageDropdown() {
+          const dropdown = document.getElementById('languageSelect');
+          languages.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.iso_639_1;
+            option.textContent = lang.english_name + (lang.name ? ` (${lang.name})` : '');
+            dropdown.appendChild(option);
+          });
+        }
+        populateLanguageDropdown();
+        const selectedListsIds = [];
+        const hideListItem = (listId) => {
+          const listItem = document.querySelector(`.list-item[data-list-id="${listId}"]`);
+          if (listItem) {
+            listItem.style.display = 'none';
+          }
+        };
+        const showListItem = (listId) => {
+          const listItem = document.querySelector(`.list-item[data-list-id="${listId}"]`);
+          if (listItem) {
+            listItem.style.display = 'block';
+          }
+        };
+        const selectedLists = [];
+        const addListToSelected = (list) => {
+          const selectedElement = document.createElement('div');
+          selectedElement.classList.add('selected-item');
+          selectedElement.setAttribute('draggable', 'true');
+          selectedElement.setAttribute('data-list-id', list.ids.trakt);
+          selectedElement.innerHTML = `
+        
+														<p>${list.name}</p>
+														<span class="remove-btn">&times;</span>
+    `;
+          selectedContainer.appendChild(selectedElement);
+          selectedLists.push({
+            id: list.ids.trakt,
+            name: list.name
+          });
+          hideListItem(list.ids.trakt);
+          selectedElement.querySelector('.remove-btn').addEventListener('click', () => {
+            selectedElement.remove();
+            const index = selectedLists.findIndex(l => l.id === list.ids.trakt);
+            if (index !== -1) {
+              selectedLists.splice(index, 1);
+            }
+            showListItem(list.ids.trakt);
+          });
+          addDragAndDropListeners(selectedElement);
+        };
+        let draggedItem = null;
+        const addDragAndDropListeners = (element) => {
+          element.addEventListener('dragstart', (e) => {
+            draggedItem = element;
+            e.dataTransfer.effectAllowed = 'move';
+            element.classList.add('dragging');
+          });
+          element.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+          });
+          element.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedItem !== element) {
+              selectedContainer.insertBefore(draggedItem, element);
+              updateSelectedListsOrder();
+            }
+            element.classList.remove('dragging');
+          });
+          element.addEventListener('dragend', () => {
+            element.classList.remove('dragging');
+          });
+        };
+        const updateSelectedListsOrder = () => {
+          selectedListsIds.length = 0;
+          const selectedItems = document.querySelectorAll('.selected-item');
+          selectedItems.forEach(item => {
+            const listId = item.getAttribute('data-list-id');
+            selectedListsIds.push(parseInt(listId));
+          });
+        };
+        const addListFromUrl = async (url) => {
+          const match = url.match(/\/lists\/(\d+)/);
+          if (!match) {
+            alert('Invalid URL format');
+            return;
+          }
+          const listId = match[1];
+          try {
+            const response = await fetch(`/lists/${listId}`);
+            if (!response.ok) {
+              throw new Error('Failed to fetch list');
+            }
+            const listData = await response.json();
+            addListToSelected(listData);
+          } catch (error) {
+            alert('Failed to add list. Please check the URL or ensure you are logged in.');
+          }
+        };
+        const addListFromUrlButton = document.getElementById('addListFromUrlButton');
+        addListFromUrlButton.addEventListener('click', () => {
+          const listUrlInput = document.getElementById('listUrlInput').value.trim();
+          if (listUrlInput) {
+            addListFromUrl(listUrlInput);
+          }
+        });
+
+        function encodeToBase64(str) {
+          return btoa(unescape(encodeURIComponent(str)));
+        }
+        const copyLinkWithSelectedLists = () => {
+          const selectedListsData = selectedLists.map(list => ({
+            id: list.id,
+            name: list.name
+          }));
+          const tmdbApiKey = document.getElementById('tmdbApiKey').value.trim();
+          const rpdbApiKey = document.getElementById('rpdbApiKey').value.trim();
+          const fanartApiKey = document.getElementById('fanartApiKey').value.trim();
+          const watchlistToggle = document.getElementById('watchlistToggle').checked;
+          const recommendationsToggle = document.getElementById('recommendationsToggle').checked;
+          const trendingToggle = document.getElementById('trendingToggle').checked;
+          const popularToggle = document.getElementById('popularToggle').checked;
+          const language = document.getElementById('languageSelect').value;
+          const traktUsername = document.getElementById('traktUsername') ? document.getElementById('traktUsername').textContent.replace('Connected as: ', '') : null;
+          const config = {
+            traktLists: selectedListsData,
+            tmdbApiKey: tmdbApiKey,
+            rpdbApiKey: rpdbApiKey,
+            fanartApiKey: fanartApiKey,
+            language: language,
+            toggles: {
+              watchlist: watchlistToggle,
+              recommendations: recommendationsToggle,
+              trending: trendingToggle,
+              popular: popularToggle
+            },
+            traktUsername: traktUsername
+          };
+          const encodedConfig = encodeToBase64(JSON.stringify(config));
+          const url = `https://${window.location.host}/${encodedConfig}/manifest.json`;
+          navigator.clipboard.writeText(url).then(() => {
+            alert('Link copied to clipboard!');
+          }).catch(err => {
+            console.error('Error copying link: ', err);
+          });
+        };
+        const copyLinkButton = document.getElementById('copyLinkButton');
+        copyLinkButton.addEventListener('click', copyLinkWithSelectedLists);
+        const getConfigFromUrl = () => {
+          const urlParams = new URLSearchParams(window.location.search);
+          const encodedConfig = urlParams.get('config');
+          if (encodedConfig) {
+            const config = JSON.parse(decodeURIComponent(encodedConfig));
+            console.log('Configuration récupérée:', config);
+            if (config.traktLists) {
+              config.traktLists.forEach(list => {
+                console.log(`Liste ID: ${list.id}, Nom: ${list.name}`);
+              });
+            }
+          } else {
+            console.warn('Aucune configuration trouvée dans l\'URL.');
+          }
+        };
+        getConfigFromUrl();
+        const renderLists = (lists, containerId, append = false) => {
+          const container = document.getElementById(containerId);
+          if (!container) {
+            console.error(`Container with ID ${containerId} not found.`);
+            return;
+          }
+          if (!append) {
+            container.innerHTML = '';
+          }
+          if (lists.length === 0 && !append) {
+            console.log('No lists found to render.');
+            container.innerHTML = ' < p > No lists found. < /p>';
+            return;
+          }
+          lists.forEach(listItem => {
+            const list = listItem.list;
+            if (list) {
+              console.log('Rendering list:', list);
+              const truncatedDescription = list.description ? list.description.length > 200 ? `${list.description.substring(0, 200)} [...]` : list.description : 'No description available';
+              const listElement = document.createElement('div');
+              listElement.classList.add('list-item');
+              listElement.setAttribute('data-list-id', list.ids.trakt);
+              listElement.innerHTML = `
+    
+														<h4>
+															<a href="${list.share_link}" target="_blank">${list.name}</a>
+														</h4>
+														<p>${truncatedDescription}</p>
+														<p>Updated at: ${new Date(list.updated_at).toLocaleString()}</p>
+														<p>Item count: ${list.item_count}, Likes: ${list.likes}</p>
+														<p>Created by: ${list.user.name}</p>
+														<button class="button-primary" data-list-id="${list.ids.trakt}">Add</button>
+`;
+              container.appendChild(listElement);
+              listElement.querySelector('button').addEventListener('click', () => {
+                addListToSelected(list);
+              });
+            } else {
+              console.warn('List item is missing the "list" property:', listItem);
+            }
+          });
+          console.log(`${lists.length} lists rendered in container ${containerId}`);
+        };
+        const fetchLists = async (type, query = '', page = 1, limit = 10) => {
+          try {
+            const url = query ? `/lists/${type}?query=${query}&page=${page}&limit=${limit}` : `/lists/${type}?page=${page}&limit=${limit}`;
+            console.log('Fetching lists from URL:', url);
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            const data = await response.json();
+            console.log('Received data:', data);
+            return data;
+          } catch (error) {
+            console.error(`Error fetching ${type} lists:`, error);
+            return [];
+          }
+        };
+        const init = async () => {
+          trendingPage = 1;
+          trendingHasMore = true;
+          trendingLoading = false;
+          const trendingLists = await fetchLists('trending', '', trendingPage);
+          if (trendingLists.length < 10) {
+            trendingHasMore = false;
+          }
+          renderLists(trendingLists, 'trendingLists');
+          popularPage = 1;
+          popularHasMore = true;
+          popularLoading = false;
+          const popularLists = await fetchLists('popular', '', popularPage);
+          if (popularLists.length < 10) {
+            popularHasMore = false;
+          }
+          renderLists(popularLists, 'popularLists');
+        };
+        init();
+        subTabs.forEach(subTab => {
+          subTab.addEventListener('click', () => {
+            subTabs.forEach(st => st.classList.remove('active'));
+            subTab.classList.add('active');
+            if (subTab.getAttribute('data-sub-tab') === 'trending') {
+              document.getElementById('trendingLists').classList.add('active');
+              document.getElementById('popularLists').classList.remove('active');
+              searchContainer.classList.remove('active');
+              searchResultsContainer.classList.remove('active');
+            } else if (subTab.getAttribute('data-sub-tab') === 'popular') {
+              document.getElementById('popularLists').classList.add('active');
+              document.getElementById('trendingLists').classList.remove('active');
+              searchContainer.classList.remove('active');
+              searchResultsContainer.classList.remove('active');
+            } else {
+              searchContainer.classList.add('active');
+              document.getElementById('trendingLists').classList.remove('active');
+              document.getElementById('popularLists').classList.remove('active');
+            }
+          });
+        });
+        tabs.forEach(tab => {
+          tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            listContainers.forEach(container => container.classList.remove('active'));
+            if (tab.getAttribute('data-tab') === 'lists') {
+              subTabs.forEach(st => st.classList.remove('active'));
+              document.querySelector('[data-sub-tab="trending"]').classList.add('active');
+              document.getElementById('trendingLists').classList.add('active');
+              document.getElementById('popularLists').classList.remove('active');
+              searchContainer.classList.remove('active');
+              searchResultsContainer.classList.remove('active');
+              subTabsContainer.classList.add('active');
+            } else if (tab.getAttribute('data-tab') === 'configuration') {
+              document.getElementById('configuration').classList.add('active');
+              subTabsContainer.classList.remove('active');
+            }
+          });
+        });
+        const trendingListsContainer = document.getElementById('trendingLists');
+        const popularListsContainer = document.getElementById('popularLists');
+        const searchResultsListContainer = document.getElementById('searchResults');
+
+        function setupInfiniteScroll(container, type) {
+          container.addEventListener('scroll', async () => {
+            if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
+              if (type === 'trending' && !trendingLoading && trendingHasMore) {
+                trendingLoading = true;
+                trendingPage += 1;
+                const lists = await fetchLists('trending', '', trendingPage);
+                if (lists.length < 10) {
+                  trendingHasMore = false;
+                }
+                renderLists(lists, 'trendingLists', true);
+                trendingLoading = false;
+              } else if (type === 'popular' && !popularLoading && popularHasMore) {
+                popularLoading = true;
+                popularPage += 1;
+                const lists = await fetchLists('popular', '', popularPage);
+                if (lists.length < 10) {
+                  popularHasMore = false;
+                }
+                renderLists(lists, 'popularLists', true);
+                popularLoading = false;
+              } else if (type === 'search' && !searchLoading && searchHasMore) {
+                searchLoading = true;
+                searchPage += 1;
+                const lists = await fetchLists('search', searchQuery, searchPage);
+                if (lists.length < 10) {
+                  searchHasMore = false;
+                }
+                renderLists(lists, 'searchResults', true);
+                searchLoading = false;
+              }
+            }
+          });
+        }
+        setupInfiniteScroll(trendingListsContainer, 'trending');
+        setupInfiniteScroll(popularListsContainer, 'popular');
+        setupInfiniteScroll(searchResultsContainer, 'search');
+      });
+    </script>
+  </body>
+</html>
