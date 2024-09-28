@@ -1,7 +1,7 @@
 const express = require('express');
 const { pool } = require('../helpers/db');
 const log = require('../helpers/logger');
-const { fetchListItems, fetchWatchlistItems, fetchRecommendations, fetchTrendingItems, fetchPopularItems } = require('../api/trakt');
+const { fetchListItems, fetchWatchlistItems, fetchRecommendations, fetchTrendingItems, fetchPopularItems, handleTraktHistory } = require('../api/trakt');
 const { getMetadataByTmdbId } = require('../api/tmdb');
 const { getFanartLogo } = require('../api/fanart');
 const { getRpdbPosterUrl } = require('../api/rpdb');
@@ -282,9 +282,18 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
                 return null;
             }
         }).filter(Boolean));
+        try {
+            let updatedMetas = metas;
 
-        res.json({ metas });
+            if (config.markContentHistory) {
+                updatedMetas = await handleTraktHistory(config, metas, type);
+            }
 
+            res.json({ metas: updatedMetas });
+        } catch (error) {
+            log.error(`Error handling Trakt history: ${error.message}`);
+            res.status(500).json({ error: "Error handling Trakt history." });
+        }
     } catch (error) {
         log.error('Error in /catalog route:', error);
         return res.status(500).json({ error: "Invalid configParameters or server error." });

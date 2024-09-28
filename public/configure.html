@@ -471,7 +471,7 @@
   </head>
   <body>
     <div class="form-container">
-      <h1>Stremio Trakt Addon (0.1.0)</h1>
+      <h1>Stremio Trakt Addon (0.3.0)</h1>
       <button id="connectTraktButton" class="connect-btn">Login to Trakt to enable all features</button>
       <div class="tabs">
         <div class="tab active" data-tab="configuration">Configuration</div>
@@ -544,7 +544,7 @@
             <input type="text" id="fanartApiKey" placeholder="Enter Fanart API key..." class="api-input">
           </div>
           <div class="config-container">
-            <div class="config-label">Mark content history as viewed on catalogs (not ready)</div>
+            <div class="config-label">Mark content history as viewed on catalogs</div>
             <div class="toggle-item">
               <label class="switch">
                 <input type="checkbox" id="markContentHistoryToggle">
@@ -742,43 +742,54 @@
           return btoa(unescape(encodeURIComponent(str)));
         }
         const copyLinkWithSelectedLists = () => {
-          const selectedListsData = selectedLists.map(list => ({
+        const selectedListsData = selectedLists.map(list => ({
             id: list.id,
             name: list.name
-          }));
-          const tmdbApiKey = document.getElementById('tmdbApiKey').value.trim();
-          const rpdbApiKey = document.getElementById('rpdbApiKey').value.trim();
-          const fanartApiKey = document.getElementById('fanartApiKey').value.trim();
-          const watchlistToggle = document.getElementById('watchlistToggle').checked;
-          const recommendationsToggle = document.getElementById('recommendationsToggle').checked;
-          const trendingToggle = document.getElementById('trendingToggle').checked;
-          const popularToggle = document.getElementById('popularToggle').checked;
-          const language = document.getElementById('languageSelect').value;
-          const traktUsername = document.getElementById('traktUsername') ? document.getElementById('traktUsername').textContent.replace('Connected as: ', '') : null;
-          const config = {
+        }));
+
+        const tmdbApiKey = document.getElementById('tmdbApiKey').value.trim();
+        const rpdbApiKey = document.getElementById('rpdbApiKey').value.trim();
+        const fanartApiKey = document.getElementById('fanartApiKey').value.trim();
+        const watchlistToggle = document.getElementById('watchlistToggle').checked;
+        const recommendationsToggle = document.getElementById('recommendationsToggle').checked;
+        const trendingToggle = document.getElementById('trendingToggle').checked;
+        const popularToggle = document.getElementById('popularToggle').checked;
+        const language = document.getElementById('languageSelect').value;
+        const traktUsername = document.getElementById('traktUsername') ? document.getElementById('traktUsername').textContent.replace('Connected as: ', '') : null;
+        const markContentHistoryToggle = document.getElementById('markContentHistoryToggle').checked;
+
+        const watchedEmoji = markContentHistoryToggle ? document.querySelector('.additional-label label').textContent.match(/Adds (.*?) in front of their name/)[1] : null;
+
+        const config = {
             traktLists: selectedListsData,
             tmdbApiKey: tmdbApiKey,
             rpdbApiKey: rpdbApiKey,
             fanartApiKey: fanartApiKey,
             language: language,
             toggles: {
-              watchlist: watchlistToggle,
-              recommendations: recommendationsToggle,
-              trending: trendingToggle,
-              popular: popularToggle
+                watchlist: watchlistToggle,
+                recommendations: recommendationsToggle,
+                trending: trendingToggle,
+                popular: popularToggle,
             },
-            traktUsername: traktUsername
+            traktUsername: traktUsername,
+            markContentHistory: markContentHistoryToggle,
+          watchedEmoji: markContentHistoryToggle ? watchedEmoji : null
+              };
+
+              const encodedConfig = encodeToBase64(JSON.stringify(config));
+              const url = `https://${window.location.host}/${encodedConfig}/manifest.json`;
+
+              navigator.clipboard.writeText(url).then(() => {
+                  alert('Link copied to clipboard!');
+              }).catch(err => {
+                  console.error('Error copying link: ', err);
+              });
           };
-          const encodedConfig = encodeToBase64(JSON.stringify(config));
-          const url = `https://${window.location.host}/${encodedConfig}/manifest.json`;
-          navigator.clipboard.writeText(url).then(() => {
-            alert('Link copied to clipboard!');
-          }).catch(err => {
-            console.error('Error copying link: ', err);
-          });
-        };
+
         const copyLinkButton = document.getElementById('copyLinkButton');
         copyLinkButton.addEventListener('click', copyLinkWithSelectedLists);
+
         const getConfigFromUrl = () => {
           const urlParams = new URLSearchParams(window.location.search);
           const encodedConfig = urlParams.get('config');
@@ -954,6 +965,81 @@
         setupInfiniteScroll(trendingListsContainer, 'trending');
         setupInfiniteScroll(popularListsContainer, 'popular');
         setupInfiniteScroll(searchResultsContainer, 'search');
+
+        const additionalLabelContainer = document.createElement('div');
+        additionalLabelContainer.className = 'additional-label';
+        additionalLabelContainer.style.display = 'none';
+        additionalLabelContainer.style.alignItems = 'center';
+
+        const additionalLabel = document.createElement('label');
+        additionalLabel.textContent = 'Adds ✔️ in front of their name';
+
+        const emojiIcon = document.createElement('span');
+        emojiIcon.innerHTML = '⚙️';
+        emojiIcon.style.marginLeft = '10px';
+        emojiIcon.style.cursor = 'pointer';
+        emojiIcon.style.fontSize = '1em';
+
+        additionalLabelContainer.appendChild(additionalLabel);
+        additionalLabelContainer.appendChild(emojiIcon);
+
+        const markContentHistoryToggleContainer = document.getElementById('markContentHistoryToggle').closest('.toggle-item');
+        markContentHistoryToggleContainer.appendChild(additionalLabelContainer);
+
+        const emojiContainer = document.createElement('div');
+        emojiContainer.style.position = 'fixed';
+        emojiContainer.style.display = 'none';
+        emojiContainer.style.backgroundColor = '#fff';
+        emojiContainer.style.border = '1px solid #ccc';
+        emojiContainer.style.zIndex = '1000';
+        emojiContainer.style.width = '90%';
+        emojiContainer.style.height = 'auto';
+        emojiContainer.style.maxWidth = '400px';
+        emojiContainer.style.maxHeight = '400px';
+        emojiContainer.style.overflow = 'auto';
+        emojiContainer.style.left = '50%';
+        emojiContainer.style.top = '50%';
+        emojiContainer.style.transform = 'translate(-50%, -50%)';
+        emojiContainer.style.boxSizing = 'border-box';
+        emojiContainer.style.borderRadius = '8px';
+        emojiContainer.style.scrollbarWidth = 'none';
+        emojiContainer.style.overflow = 'hidden';
+        document.body.appendChild(emojiContainer);
+
+        import('https://cdn.skypack.dev/picmo').then(({ createPicker }) => {
+            const picker = createPicker({
+                rootElement: emojiContainer,
+                theme: 'auto',
+            });
+
+            emojiIcon.addEventListener('click', (event) => {
+                event.stopPropagation();
+                event.preventDefault();
+
+                emojiContainer.style.display = 'block';
+
+                document.addEventListener('click', (event) => {
+                    if (!emojiContainer.contains(event.target) && !emojiIcon.contains(event.target)) {
+                        emojiContainer.style.display = 'none';
+                    }
+                });
+            });
+
+            picker.addEventListener('emoji:select', (event) => {
+                additionalLabel.textContent = `Adds ${event.emoji} in front of their name`;
+                emojiContainer.style.display = 'none';
+            });
+        });
+
+        const markContentHistoryToggle = document.getElementById('markContentHistoryToggle');
+        markContentHistoryToggle.addEventListener('change', function() {
+            if (markContentHistoryToggle.checked) {
+                additionalLabelContainer.style.display = 'flex';
+                additionalLabelContainer.style.width = '100%';
+            } else {
+                additionalLabelContainer.style.display = 'none';
+            }
+        });        
       });
     </script>
   </body>

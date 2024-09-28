@@ -252,18 +252,17 @@ async function handleTraktHistory(parsedConfig, filteredResults, type) {
     }
 
     const traktIdsResult = await pool.query(
-        `SELECT tmdb_id FROM trakt_history WHERE username = $1 AND type = $2 AND tmdb_id IS NOT NULL`,
+        `SELECT imdb_id FROM trakt_history WHERE username = $1 AND type = $2 AND imdb_id IS NOT NULL`,
         [traktUsername, dbType]
     );
 
     log.debug(`Fetching Trakt history for user ${traktUsername} with type ${dbType}. Result: ${traktIdsResult.rows.length} items found.`);
-
-    const traktIds = traktIdsResult.rows.map(row => `tmdb:${row.tmdb_id}`);
+    const traktIds = traktIdsResult.rows.map(row => `${row.imdb_id}`);
 
     return filteredResults.map(content => {
-        const contentId = `tmdb:${content.id}`;
+        const contentId = `${content.id}`;
         if (traktIds.includes(contentId)) {
-            content.title = `${watchedEmoji} ${content.title || content.name}`;
+            content.name = `${watchedEmoji} ${content.name || content.title}`;
         }
         return content;
     });

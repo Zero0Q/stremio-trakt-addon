@@ -21,13 +21,13 @@ This is a specialized addon for Stremio, integrating deeply with Trakt services 
 ### Fanart integration
 - Replace titles with logos in the selected language (or English by default) to enhance visual appeal when available.
 
-### Trakt history sync (not ready yet)
+### Automatic Trakt history sync
 - Synchronize your watch history with Stremio, ensuring your watched items are marked in your catalogs with a custom emoji of your choice.
 
 ### Automatic token refresh
 - Avoid manual re-authentication by using an **automatic token refresh** system, maintaining access without interruptions.
 
-### Mark content as watched (not ready yet)
+### Mark content as watched
 - Manually **mark content as watched** on Trakt directly from Stremio, with the option to rename or translate the action button text for better localization.
 
 ### Progressive scraping (not ready yet)

@@ -38,7 +38,7 @@ router.get("/:configParameters?/manifest.json", async (req, res) => {
 
         const manifest = {
             "id": "com.stremio.stremiotraktaddon",
-            "version": "0.1.0",
+            "version": "0.3.0",
             "name": "Trakt Addon",
             "description": "Addon that generates dynamic catalogs based on Trakt lists & catalogs in your language.",
             "resources": [ "catalog" ],
