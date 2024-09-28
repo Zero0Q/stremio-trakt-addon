@@ -1,6 +1,20 @@
 const express = require('express');
 const log = require('../helpers/logger');
+const { pool } = require('../helpers/db');
+const { fetchAndStoreGenres } = require('../api/trakt');
 
+const getGenres = async (type) => {
+    try {
+        const result = await pool.query(
+            "SELECT genre_name FROM genres WHERE media_type = $1", 
+            [type]
+        );
+        return result.rows.map(row => row.genre_name);
+    } catch (err) {
+        throw err;
+    }
+};
+  
 const router = express.Router();
 
 router.get("/:configParameters?/manifest.json", async (req, res) => {
@@ -13,6 +27,14 @@ router.get("/:configParameters?/manifest.json", async (req, res) => {
             const decodedConfig = decodeURIComponent(configParameters);
             config = JSON.parse(decodedConfig);
         }
+
+        if (!(await pool.query("SELECT 1 FROM genres LIMIT 1")).rows.length) {
+            log.debug(`Fetching genres`);
+            await fetchAndStoreGenres();
+        }
+
+        const movieGenres = await getGenres('movie');
+        const seriesGenres = await getGenres('series');
 
         const manifest = {
             "id": "com.stremio.stremiotraktaddon",
@@ -32,86 +54,61 @@ router.get("/:configParameters?/manifest.json", async (req, res) => {
             }
         };
 
+        const createCatalog = (type, id, name, genres = [], addSortingOptions = false) => ({
+            type,
+            id,
+            name,
+            "extra": [
+                ...(genres.length ? [{ name: 'genre', isRequired: false, options: genres }] : []),
+                { name: "skip", isRequired: false },
+                ...(addSortingOptions ? [
+                    {
+                        name: 'sortBy',
+                        isRequired: false,
+                        options: [
+                            'rank_asc', 'rank_desc',
+                            'listed_at_asc', 'listed_at_desc',
+                            'title_asc', 'title_desc',
+                            'year_asc', 'year_desc'
+                        ]
+                    }
+                ] : [])
+            ]
+        });
+
         if (config.traktLists && Array.isArray(config.traktLists)) {
             config.traktLists.forEach(list => {
-                manifest.catalogs.push({
-                    "type": "list",
-                    "id": `trakt_${list.id}`,
-                    "name": list.name,
-                    "extra": [
-                        { name: "skip", isRequired: false }
-                    ]
-                });
+                manifest.catalogs.push(createCatalog('list', `trakt_${list.id}`, list.name, [], true));
             });
         }
 
         const toggles = config.toggles || {};
-        
+
         if (toggles.watchlist) {
             manifest.catalogs.push(
-                { 
-                    type: 'movie', 
-                    id: 'watchlist_movies', 
-                    name: 'Watchlist Movies',
-                    extra: [{ name: "skip", isRequired: false }]
-                },
-                { 
-                    type: 'series', 
-                    id: 'watchlist_series', 
-                    name: 'Watchlist Series',
-                    extra: [{ name: "skip", isRequired: false }]
-                }
+                createCatalog('movie', 'watchlist_movies', 'Watchlist Movies', movieGenres),
+                createCatalog('series', 'watchlist_series', 'Watchlist Series', seriesGenres)
             );
         }
 
         if (toggles.recommendations) {
             manifest.catalogs.push(
-                { 
-                    type: 'movie', 
-                    id: 'recommendations_movies', 
-                    name: 'Recommended Movies',
-                    extra: [{ name: "skip", isRequired: false }]
-                },
-                { 
-                    type: 'series', 
-                    id: 'recommendations_series', 
-                    name: 'Recommended Series',
-                    extra: [{ name: "skip", isRequired: false }]
-                }
+                createCatalog('movie', 'recommendations_movies', 'Recommended Movies', movieGenres),
+                createCatalog('series', 'recommendations_series', 'Recommended Series', seriesGenres)
             );
         }
 
         if (toggles.trending) {
             manifest.catalogs.push(
-                { 
-                    type: 'movie', 
-                    id: 'trending_movies', 
-                    name: 'Trending Movies',
-                    extra: [{ name: "skip", isRequired: false }]
-                },
-                { 
-                    type: 'series', 
-                    id: 'trending_series', 
-                    name: 'Trending Series',
-                    extra: [{ name: "skip", isRequired: false }]
-                }
+                createCatalog('movie', 'trending_movies', 'Trending Movies', movieGenres),
+                createCatalog('series', 'trending_series', 'Trending Series', seriesGenres)
             );
         }
 
         if (toggles.popular) {
             manifest.catalogs.push(
-                { 
-                    type: 'movie', 
-                    id: 'popular_movies', 
-                    name: 'Popular Movies',
-                    extra: [{ name: "skip", isRequired: false }]
-                },
-                { 
-                    type: 'series', 
-                    id: 'popular_series', 
-                    name: 'Popular Series',
-                    extra: [{ name: "skip", isRequired: false }]
-                }
+                createCatalog('movie', 'popular_movies', 'Popular Movies', movieGenres),
+                createCatalog('series', 'popular_series', 'Popular Series', seriesGenres)
             );
         }
 

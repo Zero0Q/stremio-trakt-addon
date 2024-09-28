@@ -10,6 +10,21 @@ const generateRedisKey = (tmdbId, type, language) => {
     return `tmdb:${type}:${tmdbId}:${language}`;
 };
 
+const formatRuntime = (runtime) => {
+    if (!runtime) return null;
+
+    const hours = Math.floor(runtime / 60);
+    const minutes = runtime % 60;
+
+    if (hours > 0 && minutes > 0) {
+        return `${hours}h${minutes.toString().padStart(2, '0')}`;
+    } else if (hours > 0) {
+        return `${hours}h`;
+    } else {
+        return `${minutes}m`;
+    }
+};
+
 const getMetadataByTmdbId = async (tmdbId, type, tmdbApiKey, language = 'en-US') => {
     const redisKey = generateRedisKey(tmdbId, type, language);
     const endpoint = `${TMDB_BASE_URL}/${type}/${tmdbId}?language=${language}&api_key=${tmdbApiKey}`;
@@ -31,7 +46,11 @@ const getMetadataByTmdbId = async (tmdbId, type, tmdbApiKey, language = 'en-US')
             title: data.title || data.name,
             poster: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null,
             description: data.overview,
-            releaseDate: data.release_date || data.first_air_date,
+            releaseDate: (data.release_date || data.first_air_date || '').slice(0, 4),
+            lastAirDate: data.last_air_date ? data.last_air_date.slice(0, 4) : null,
+            imdbRating: data.vote_average ? data.vote_average.toFixed(1) : null,
+            genres: data.genres ? data.genres.map(genre => genre.name) : [],
+            runtime: formatRuntime(data.runtime)
         };
 
         const cacheDuration = parseCacheDuration(process.env.TMDB_CACHE_DURATION || '1d');
@@ -46,6 +65,4 @@ const getMetadataByTmdbId = async (tmdbId, type, tmdbApiKey, language = 'en-US')
     }
 };
 
-module.exports = {
-    getMetadataByTmdbId
-};
+module.exports = { getMetadataByTmdbId };

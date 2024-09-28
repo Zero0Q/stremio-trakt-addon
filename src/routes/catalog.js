@@ -1,9 +1,22 @@
 const express = require('express');
+const { pool } = require('../helpers/db');
 const log = require('../helpers/logger');
 const { fetchListItems, fetchWatchlistItems, fetchRecommendations, fetchTrendingItems, fetchPopularItems } = require('../api/trakt');
 const { getMetadataByTmdbId } = require('../api/tmdb');
 const { getFanartLogo } = require('../api/fanart');
 const { getRpdbPosterUrl } = require('../api/rpdb');
+
+const getGenreSlug = async (genreName, mediaType) => {
+    try {
+        const result = await pool.query(
+            "SELECT genre_slug FROM genres WHERE genre_name = $1 AND media_type = $2",
+            [genreName, mediaType]
+        );
+        return result.rows.length ? result.rows[0].genre_slug : null;
+    } catch (err) {
+        throw err;
+    }
+};
 
 const router = express.Router();
 
@@ -11,8 +24,8 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
     const { type, id, extra } = req.params;
     let cleanId = id.startsWith('trakt_') ? id.replace('trakt_', '') : id;
 
-        log.debug(`Type before processing: ${type}`);
-        log.debug(`ID before processing: ${cleanId}`);
+    log.debug(`Type before processing: ${type}`);
+    log.debug(`ID before processing: ${cleanId}`);
 
     const { configParameters } = req.params;
     let config = {};
@@ -40,20 +53,43 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
         }
 
         let skip = 0;
+        let genre = null;
+        let sortBy = null;
+        let sortHow = 'asc';
+
         if (extra) {
-            const extraParams = extra.split('=');
-            if (extraParams[0] === 'skip' && !isNaN(extraParams[1])) {
-                skip = parseInt(extraParams[1]);
+            const extraParams = extra.split('&');
+            for (const param of extraParams) {
+                const [key, value] = param.split('=');
+                if (key === 'skip' && !isNaN(value)) {
+                    skip = parseInt(value);
+                } else if (key === 'genre') {
+                    genre = value;
+                } else if (key === 'sortBy') {
+                    const lastUnderscore = value.lastIndexOf('_');
+                    if (lastUnderscore !== -1) {
+                        sortBy = value.slice(0, lastUnderscore);
+                        sortHow = value.slice(lastUnderscore + 1);
+                    }
+                }
             }
         }
 
         const limit = 20;
         const page = Math.floor(skip / limit) + 1;
 
-        log.debug(`Fetching list items with skip: ${skip}, limit: ${limit}, page: ${page}`);
+        let genreSlug = null;
+        if (genre) {
+            genreSlug = await getGenreSlug(genre, type);
+            if (!genreSlug) {
+                return res.status(400).json({ error: `Genre '${genre}' not found for type '${type}'` });
+            }
+        }
+
+        log.debug(`Fetching list items with skip: ${skip}, limit: ${limit}, page: ${page}, genre: ${genre}, genreSlug: ${genreSlug}, sortBy: ${sortBy}, sortHow: ${sortHow}`);
 
         let allItems = [];
-
+        
         switch (cleanId) {
             case 'watchlist_movies':
             case 'watchlist_series':
@@ -68,22 +104,30 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
             case 'trending_movies':
             case 'trending_series':
                 log.debug(`Fetching trending items for ${type}`);
-                allItems = await fetchTrendingItems(type, page, limit);
+                allItems = await fetchTrendingItems(type, page, limit, genreSlug);
                 break;
             case 'popular_movies':
             case 'popular_series':
                 log.debug(`Fetching popular items for ${type}`);
-                allItems = await fetchPopularItems(type, page, limit);
+                allItems = await fetchPopularItems(type, page, limit, genreSlug);
                 break;
             default:
                 log.debug(`Fetching list items from Trakt API for list ${cleanId}`);
-                allItems = await fetchListItems(cleanId, type, page, limit);
+                if (sortBy) {
+                    log.debug(`Sorting provided: ignoring pagination, using sortBy: ${sortBy} and sortHow: ${sortHow}`);
+                    allItems = await fetchListItems(cleanId, type, null, null, sortBy, sortHow);
+                } else {
+                    log.debug(`No sorting provided: using pagination with page: ${page}, limit: ${limit}`);
+                    allItems = await fetchListItems(cleanId, type, page, limit);
+                }
                 break;
         }
 
         log.debug(`Items fetched for list ${cleanId}: ${allItems.length} items`);
 
-        const metas = await Promise.all(allItems.map(async (item) => {
+        const paginatedItems = sortBy ? allItems.slice(skip, skip + limit) : allItems;
+
+        const metas = await Promise.all(paginatedItems.map(async (item) => {
             let logoUrl = '';
             let posterUrl = '';
 
@@ -111,7 +155,10 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
                             logo: logoUrl,
                             description: tmdbDetails.description,
                             releaseInfo: tmdbDetails.releaseDate,
-                            posterShape: 'poster'
+                            posterShape: 'poster',
+                            imdbRating: tmdbDetails.imdbRating,
+                            genres: tmdbDetails.genres,
+                            runtime: tmdbDetails.runtime
                         };
                     } catch (error) {
                         log.error(`Error fetching TMDB details for movie: ${movie.title}, TMDB ID: ${movie.ids.tmdb} - ${error.message}`);
@@ -130,11 +177,15 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
                         } else {
                             posterUrl = tmdbDetails.poster;
                         }
-
+            
                         if (fanartApiKey) {
                             logoUrl = await getFanartLogo(show.ids.tmdb, language, fanartApiKey);
                         }
-
+            
+                        const releaseInfo = tmdbDetails.releaseDate === tmdbDetails.lastAirDate
+                            ? tmdbDetails.releaseDate
+                            : `${tmdbDetails.releaseDate}-${tmdbDetails.lastAirDate}`;
+            
                         return {
                             id: `${show.ids.imdb}`,
                             type: 'series',
@@ -142,8 +193,11 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
                             poster: posterUrl,
                             logo: logoUrl,
                             description: tmdbDetails.description,
-                            releaseInfo: tmdbDetails.releaseDate,
-                            posterShape: 'poster'
+                            releaseInfo,
+                            posterShape: 'poster',
+                            imdbRating: tmdbDetails.imdbRating,
+                            genres: tmdbDetails.genres,
+                            runtime: tmdbDetails.runtime
                         };
                     } catch (error) {
                         log.error(`Error fetching TMDB details for show: ${show.title}, TMDB ID: ${show.ids.tmdb} - ${error.message}`);
@@ -176,7 +230,10 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
                             logo: logoUrl,
                             description: tmdbDetails.description,
                             releaseInfo: tmdbDetails.releaseDate,
-                            posterShape: 'poster'
+                            posterShape: 'poster',
+                            imdbRating: tmdbDetails.imdbRating,
+                            genres: tmdbDetails.genres,
+                            runtime: tmdbDetails.runtime
                         };
                     } catch (error) {
                         log.error(`Error fetching TMDB details for list item: ${listItem.movie.title}, TMDB ID: ${listItem.movie.ids.tmdb} - ${error.message}`);
@@ -197,6 +254,10 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
                             logoUrl = await getFanartLogo(listItem.show.ids.tmdb, language, fanartApiKey);
                         }
 
+                        const releaseInfo = tmdbDetails.releaseDate === tmdbDetails.lastAirDate
+                            ? tmdbDetails.releaseDate
+                            : `${tmdbDetails.releaseDate}-${tmdbDetails.lastAirDate}`;
+            
                         return {
                             id: `${listItem.show.ids.imdb}`,
                             type: 'series',
@@ -204,8 +265,11 @@ router.get("/:configParameters?/catalog/:type/:id/:extra?.json", async (req, res
                             poster: posterUrl,
                             logo: logoUrl,
                             description: tmdbDetails.description,
-                            releaseInfo: tmdbDetails.releaseDate,
-                            posterShape: 'poster'
+                            releaseInfo,
+                            posterShape: 'poster',
+                            imdbRating: tmdbDetails.imdbRating,
+                            genres: tmdbDetails.genres,
+                            runtime: tmdbDetails.runtime
                         };
                     } catch (error) {
                         log.error(`Error fetching TMDB details for list item: ${listItem.show.title}, TMDB ID: ${listItem.show.ids.tmdb} - ${error.message}`);

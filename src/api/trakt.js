@@ -386,15 +386,54 @@ const fetchListById = async (listId, accessToken = null) => {
     return await fetchData(endpoint, {}, accessToken);
 };
 
-const fetchListItems = async (listId, type, page = 1, limit = 20, accessToken = null) => {
-    const endpoint = `/lists/${listId}/items/movies,show`;
-    const params = { page, limit };
+const fetchListItems = async (listId, type, page = 1, limit = 20, sortBy = null, sortHow = 'asc', accessToken = null) => {
+    const endpoint = `/lists/${listId}/items/movies,shows`;
 
-    log.debug(`Fetching list items from Trakt API with listId: ${listId}, type: ${type}, page: ${page}, limit: ${limit}`);
+    let params = {};
+    if (!sortBy) {
+        params = { page, limit };
+    }
+
+    log.debug(`Fetching list items from Trakt API with listId: ${listId}, type: ${type}, page: ${page}, limit: ${limit}, sortBy: ${sortBy}, sortHow: ${sortHow}`);
 
     try {
         const data = await fetchData(endpoint, params, accessToken);
+
         log.debug(`Data successfully retrieved from Trakt API: ${endpoint}`);
+
+        if (sortBy) {
+            data.sort((a, b) => {
+                let valueA, valueB;
+
+                switch (sortBy) {
+                    case 'rank':
+                        valueA = a.rank;
+                        valueB = b.rank;
+                        break;
+                    case 'listed_at':
+                        valueA = new Date(a.listed_at);
+                        valueB = new Date(b.listed_at);
+                        break;
+                    case 'title':
+                        valueA = (a.movie?.title || a.show?.title || '').toLowerCase();
+                        valueB = (b.movie?.title || b.show?.title || '').toLowerCase();
+                        break;
+                    case 'year':
+                        valueA = a.movie?.year || a.show?.year || 0;
+                        valueB = b.movie?.year || b.show?.year || 0;
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (sortHow === 'desc') {
+                    return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
+                } else {
+                    return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
+                }
+            });
+        }
+
         return data;
     } catch (error) {
         log.error(`Error fetching list items from Trakt API: ${endpoint} - ${error.message}`);
@@ -402,13 +441,16 @@ const fetchListItems = async (listId, type, page = 1, limit = 20, accessToken = 
     }
 };
 
-const fetchTrendingItems = async (type, page = 1, limit = 20) => {
+const fetchTrendingItems = async (type, page = 1, limit = 20, genre = null) => {
     const convertedType = type === 'movie' ? 'movies' : type === 'series' ? 'shows' : type;
     const endpoint = `/${convertedType}/trending`;
     const params = { page, limit };
+    if (genre) {
+        params.genres = genre;
+    }
 
     try {
-        log.debug(`Fetching trending items for type: ${type} (converted to ${convertedType}), page: ${page}, limit: ${limit}`);
+        log.debug(`Fetching trending items for type: ${type} (converted to ${convertedType}), page: ${page}, limit: ${limit}, genre: ${genre}`);
         const data = await fetchData(endpoint, params);
         log.debug(`Data successfully retrieved for trending ${convertedType}: ${endpoint}`);
         return data;
@@ -418,13 +460,16 @@ const fetchTrendingItems = async (type, page = 1, limit = 20) => {
     }
 };
 
-const fetchPopularItems = async (type, page = 1, limit = 20) => {
+const fetchPopularItems = async (type, page = 1, limit = 20, genre = null) => {
     const convertedType = type === 'movie' ? 'movies' : type === 'series' ? 'shows' : type;
     const endpoint = `/${convertedType}/popular`;
     const params = { page, limit };
+    if (genre) {
+        params.genres = genre;
+    }
 
     try {
-        log.debug(`Fetching popular items for type: ${type} (converted to ${convertedType}), page: ${page}, limit: ${limit}`);
+        log.debug(`Fetching popular items for type: ${type} (converted to ${convertedType}), page: ${page}, limit: ${limit}, genre: ${genre}`);
         const data = await fetchData(endpoint, params);
         log.debug(`Data successfully retrieved for popular ${convertedType}: ${endpoint}`);
         return data;
@@ -494,4 +539,57 @@ const fetchRecommendations = async (username, type = 'movies', ignoreCollected =
     }
 };
 
-module.exports = { makeGetRequest, makePostRequest, fetchUserHistory, fetchUserProfile, exchangeCodeForToken, handleTraktHistory, markContentAsWatched, lookupTraktId, saveUserWatchedHistory, fetchTrendingLists, fetchPopularLists, searchLists, fetchListById, fetchListItems, fetchTrendingItems, fetchPopularItems, fetchWatchlistItems, fetchRecommendations };
+const fetchGenres = async (type) => {
+    const endpoint = `/genres/${type}`;
+  
+    try {
+      const genresData = await fetchData(endpoint);
+      log.debug(`Genres retrieved for ${type}`);
+      return genresData;
+    } catch (error) {
+      log.error(`Error fetching genres from Trakt: ${error.message}`);
+      throw error;
+    }
+  };
+
+const storeGenresInDb = async (genres, mediaType) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+  
+        const insertGenreText = `
+            INSERT INTO genres (genre_slug, genre_name, media_type)
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
+        `;
+      
+        for (const genre of genres) {
+            await client.query(insertGenreText, [genre.slug, genre.name, mediaType]);
+        }
+  
+        await client.query('COMMIT');
+        log.info(`Genres stored for ${mediaType}`);
+    } catch (err) {
+        await client.query('ROLLBACK');
+        log.error(`Error inserting genre: ${err.message}`);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+const fetchAndStoreGenres = async () => {
+    try {
+        const movieGenres = await fetchGenres('movies');
+        const showGenres = await fetchGenres('shows');
+  
+        await storeGenresInDb(movieGenres, 'movie');
+        await storeGenresInDb(showGenres, 'series');
+
+        log.info(`Genres fetched and stored`);
+    } catch (error) {
+        log.error(`Error fetching/storing genres: ${error.message}`);
+    }
+};
+
+module.exports = { makeGetRequest, makePostRequest, fetchUserHistory, fetchUserProfile, exchangeCodeForToken, handleTraktHistory, markContentAsWatched, lookupTraktId, saveUserWatchedHistory, fetchTrendingLists, fetchPopularLists, searchLists, fetchListById, fetchListItems, fetchTrendingItems, fetchPopularItems, fetchWatchlistItems, fetchRecommendations, fetchAndStoreGenres };

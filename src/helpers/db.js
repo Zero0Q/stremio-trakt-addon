@@ -52,7 +52,14 @@ const traktDb = createDatabaseAndTable(
     `
 );
 
-module.exports = {
-    pool,
-    traktDb
-};
+const genresDb = createDatabaseAndTable(
+    `CREATE TABLE IF NOT EXISTS genres (
+        genre_slug TEXT,
+        genre_name TEXT,
+        media_type TEXT,
+        PRIMARY KEY (genre_slug, media_type),
+        UNIQUE (genre_slug, media_type)
+    );`
+);
+
+module.exports = { pool };
