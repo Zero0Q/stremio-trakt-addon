@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const { CACHE_POSTER_CONTENT_DURATION_DAYS } = process.env;
-const baseUrl = process.env.BASE_URL || 'http://localhost:7000';
+const baseUrl = process.env.BASE_URL || 'https://stremio-trakt-dddon-5b1d9b989d0b.herokuapp.com';
 
 const defaultCacheDurationDays = 3;
 
