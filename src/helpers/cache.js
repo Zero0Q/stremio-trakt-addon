@@ -22,6 +22,18 @@ const formatFileName = (posterId) => {
     return posterId.replace(/[^a-zA-Z0-9-_]/g, '_');
 };
 
+/**
+ * Checks the cache for a poster and returns its URL if present and valid.
+ * @example
+ * checkPosterCache(posterId)
+ * { poster_url: 'http://example.com/poster/12345.jpg' }
+ * @param {string} posterId - The ID of the poster to be checked in the cache.
+ * @returns {Object|null} An object containing the poster URL if cached and valid, otherwise null.
+ * @description
+ *   - Formats the posterId to create the expected filename for the cache.
+ *   - Checks if the file exists and is not expired based on a defined cache duration.
+ *   - Logs whether the poster URL was served from the cache or missed.
+ */
 const getCachedPoster = async (posterId) => {
     const formattedPosterId = formatFileName(posterId);
     const filePath = path.join(posterDirectory, `${formattedPosterId}.jpg`);
@@ -37,6 +49,19 @@ const getCachedPoster = async (posterId) => {
     }
 };
 
+/**
+* Caches a poster image locally by downloading it from a given URL.
+* @example
+* sync("12345", "http://example.com/poster.jpg")
+* // No return value; caches the image locally
+* @param {string} posterId - The unique identifier for the poster.
+* @param {string} posterUrl - The URL from which to download the poster image.
+* @returns {void} No return value. Throws an error if the download or write operation fails.
+* @description
+*   - Uses axios to perform a GET request with responseType 'arraybuffer'.
+*   - Writes the fetched image data to a local file system at a pre-defined directory.
+*   - Logs debug information if caching is successful, and error details upon failure.
+*/
 const setCachedPoster = async (posterId, posterUrl) => {
     const formattedPosterId = formatFileName(posterId);
     const filePath = path.join(posterDirectory, `${formattedPosterId}.jpg`);

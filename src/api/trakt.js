@@ -11,6 +11,20 @@ const TRAKT_API_KEY = process.env.TRAKT_CLIENT_ID;
 const TRAKT_CLIENT_SECRET = process.env.TRAKT_CLIENT_SECRET;
 const TRAKT_REDIRECT_URI = `${process.env.BASE_URL}/callback`;
 
+/**
+ * Makes an API GET request to the specified URL and caches the result.
+ * @example
+ * getTraktData('https://api.trakt.tv/shows/popular', 'your_access_token')
+ * // Returns a promise resolving to the data obtained from the URL
+ * @param {string} url - The URL to make the GET request to.
+ * @param {string|null} accessToken - Optional access token for authenticated requests.
+ * @returns {Promise<Object>} A promise that resolves to the data retrieved from the API, either from cache or directly from the API call.
+ * @description
+ *   - Utilizes a caching mechanism to reduce redundant API requests by storing results in Redis.
+ *   - Handles both authenticated and unauthenticated requests based on the presence of an access token.
+ *   - Utilizes an external queue system to manage the rate of API requests.
+ *   - Logs request outcomes and potential errors for debugging purposes.
+ */
 const makeGetRequest = (url, accessToken = null) => {
     const headers = {
         'trakt-api-version': TRAKT_API_VERSION,
@@ -54,6 +68,21 @@ const makeGetRequest = (url, accessToken = null) => {
     });
 };
 
+/**
+* Makes a POST request to the specified URL with optional caching using Redis
+* @example
+* postToTraktAPI('https://api.trakt.tv/sync/collection', data, 'yourAccessToken')
+* // Returns a Promise that resolves to the response data from the API
+* @param {string} url - The URL to send the POST request to.
+* @param {object} data - The data to be sent in the body of the POST request.
+* @param {string|null} accessToken - Optional access token for authorization.
+* @returns {Promise<object>} Promise that resolves to the response data from the API.
+* @description
+*   - Utilizes Redis for potential caching of response when making API calls.
+*   - Adds the API call to a queue for rate limiting purposes.
+*   - Caches successful POST request responses for a configurable duration.
+*   - Handles authorization through optional access token if provided.
+*/
 const makePostRequest = (url, data, accessToken = null) => {
     const headers = {
         'trakt-api-version': TRAKT_API_VERSION,
@@ -92,6 +121,18 @@ const makePostRequest = (url, data, accessToken = null) => {
     });
 };
 
+/**
+* Exchanges an authorization code for an access token from the Trakt API.
+* @example
+* sync('sample_auth_code')
+* { access_token: 'xyz123', ... }
+* @param {string} code - The authorization code to be exchanged for an access token.
+* @returns {Promise<object>} A promise that resolves to the response containing the access token and related details.
+* @description
+*   - Uses a POST request to interact with the Trakt API.
+*   - Requires valid client credentials such as client_id and client_secret.
+*   - Handles errors by logging them and rethrowing to manage in higher-level logic or handlers.
+*/
 const exchangeCodeForToken = async (code) => {
     try {
         const response = await makePostRequest(`${TRAKT_BASE_URL}/oauth/token`, {
@@ -109,6 +150,21 @@ const exchangeCodeForToken = async (code) => {
     }
 };
 
+/**
+* Synchronously sends a GET request to the specified endpoint and retrieves data.
+* @example
+* sync('/movies/popular', { limit: 10 }, 'yourAccessToken')
+* Promise resolving to an array of popular movies
+* @param {string} endpoint - The API endpoint to send the request to.
+* @param {Object} [params={}] - Query parameters to include in the request.
+* @param {string|null} [accessToken=null] - OAuth access token for authentication.
+* @returns {Promise<Object>} A promise resolving to the data retrieved from the endpoint.
+* @description
+*   - Builds a request URL by appending the given endpoint and query parameters to the TRAKT_BASE_URL.
+*   - Utilizes an internal function 'makeGetRequest' to perform the HTTP request.
+*   - Logs the success message upon successful data retrieval.
+*   - Propagates any errors encountered during the request process.
+*/
 const fetchData = async (endpoint, params = {}, accessToken = null) => {
     const queryString = new URLSearchParams(params).toString();
     const url = `${TRAKT_BASE_URL}${endpoint}?${queryString}`;
@@ -122,6 +178,18 @@ const fetchData = async (endpoint, params = {}, accessToken = null) => {
     }
 };
 
+/**
+* Refreshes the authentication token using the provided refresh token.
+* @example
+* sync('your_refresh_token')
+* // returns response data from the token refresh request
+* @param {string} refreshToken - The refresh token to request a new access token.
+* @returns {Promise<object>} The response data from the token refresh request.
+* @description
+*   - Uses Trakt API endpoint to exchange the refresh token for a new access token.
+*   - Handles errors by logging them and rethrowing for further handling.
+*   - Logs a debug message upon successful token refresh.
+*/
 const refreshTraktToken = async (refreshToken) => {
     const payload = {
         refresh_token: refreshToken,
@@ -152,6 +220,19 @@ const updateTokensInDb = async (username, newAccessToken, newRefreshToken) => {
     );
 };
 
+/**
+ * Fetches watched items for a specific user and type from the Trakt API.
+ * @example
+ * sync('john_doe', 'movies', 'abc123')
+ * Promise resolving to the list of watched movies
+ * @param {string} username - The Trakt username whose watched items are to be retrieved.
+ * @param {string} type - The content type to fetch (e.g., 'movies', 'shows').
+ * @param {string} accessToken - The access token for authenticating with the Trakt API.
+ * @returns {Promise<any>} A promise that resolves with the data from the API or rejects with an error.
+ * @description
+ *   - Authenticates the request using the provided access token.
+ *   - Throws 'token_expired' error if the access token has expired.
+ */
 const fetchUserHistory = async (username, type, accessToken) => {
     const endpoint = `/users/${username}/watched/${type}`;
 
@@ -166,6 +247,20 @@ const fetchUserHistory = async (username, type, accessToken) => {
     }
 };
 
+/**
+ * Handles updating Trakt history and marks watched content.
+ * @example
+ * handleTraktHistory(parsedConfig, filteredResults, 'movies')
+ * // Returns processed results with watched indications
+ * @param {Object} parsedConfig - Configuration object containing Trakt username and optional watched emoji.
+ * @param {Array} filteredResults - Array of filtered content results to be processed.
+ * @param {string} type - Type of content to handle ('movies' or 'series').
+ * @returns {Array} Processed content results with watched indications when applicable.
+ * @description
+ *   - Fetches user's Trakt history if the last fetch was outside the configured interval.
+ *   - Updates the Trakt tokens if they are expired during fetching.
+ *   - Marks content with a specific emoji if it exists in the user's Trakt history.
+ */
 async function handleTraktHistory(parsedConfig, filteredResults, type) {
     const traktUsername = parsedConfig.traktUsername;
     const watchedEmoji = parsedConfig.watchedEmoji || '✔️';
@@ -268,6 +363,19 @@ async function handleTraktHistory(parsedConfig, filteredResults, type) {
     });
 }
 
+/**
+ * Save the user's viewing history to the database
+ * @example
+ * sync('john_doe', [{ movie: { ids: { imdb: 'tt1234567', tmdb: '123456' }, title: 'Movie Title' }, last_watched_at: '2023-10-01' }])
+ * // Saves or updates history for 'john_doe' based on provided records
+ * @param {string} username - The username of the user whose history is being updated.
+ * @param {Array} history - An array containing the viewing history records, each with movie or show details.
+ * @returns {void} No value is returned.
+ * @description
+ *   - Records or updates user's viewing history in a PostgreSQL database.
+ *   - Starts a database transaction to ensure data consistency.
+ *   - After attempting to save or update all records, it either commits the transaction or rolls back in case of an error.
+ */
 const saveUserWatchedHistory = async (username, history) => {
     if (!history || history.length === 0) {
         log.warn(`No history to save for user ${username}.`);
@@ -322,6 +430,20 @@ const fetchUserProfile = async (accessToken) => {
     return await fetchData(endpoint, {}, accessToken);
 };
 
+/**
+ * Retrieves the Trakt ID associated with a given TMDB ID.
+ * @example
+ * lookupTraktId(12345, 'movie', 'your_access_token')
+ * 67890
+ * @param {number} tmdbId - The TMDB ID for which the Trakt ID is needed.
+ * @param {string} type - The type of media ('movie', 'show', etc.).
+ * @param {string} accessToken - The access token for authentication.
+ * @returns {number} The Trakt ID corresponding to the given TMDB ID.
+ * @description
+ *   - Makes a GET request to the Trakt API to retrieve data.
+ *   - Throws an error if no matching Trakt ID is found.
+ *   - Logs an error with the message for troubleshooting in case of failure.
+ */
 async function lookupTraktId(tmdbId, type, accessToken) {
     const url = `${TRAKT_BASE_URL}/search/tmdb/${tmdbId}?type=${type}`;
 
@@ -340,6 +462,21 @@ async function lookupTraktId(tmdbId, type, accessToken) {
 }
 
 
+/**
+* Synchronizes watched status for movies or series with Trakt.
+* @example
+* sync('accessToken123', 'movies', 456, '2023-09-30T12:34:56Z')
+* Promise resolving with API response data
+* @param {string} access_token - The user's Trakt API access token.
+* @param {string} type - Type of content, either 'movies' or 'series'.
+* @param {number} id - The Trakt ID of the movie or series.
+* @param {string} watched_at - The ISO 8601 formatted date-time string when the movie or episode was watched.
+* @returns {Promise<Object>} The response object from the Trakt API.
+* @description
+*   - Captures errors during the API request and logs them before rethrowing.
+*   - The function builds the request payload based on whether the type is 'movies' or 'series'.
+*   - Uses `makePostRequest` to communicate with the Trakt API for syncing.
+*/
 const markContentAsWatched = async (access_token, type, id, watched_at) => {
     const url = `${TRAKT_BASE_URL}/sync/history`;
   
@@ -385,6 +522,25 @@ const fetchListById = async (listId, accessToken = null) => {
     return await fetchData(endpoint, {}, accessToken);
 };
 
+/**
+ * Fetches and optionally sorts list items from the Trakt API.
+ * @example
+ * sync('12345', 'movies')
+ * [ { title: 'Movie A', year: 2021 }, { title: 'Movie B', year: 2020 } ]
+ * @param {string} listId - The identifier of the list to fetch items from.
+ * @param {string} type - The type of items to fetch (e.g., 'movies', 'shows').
+ * @param {number} [page=1] - The page of results to fetch.
+ * @param {number} [limit=20] - The number of items per page.
+ * @param {string|null} [sortBy=null] - The field by which results should be sorted (e.g., 'rank', 'listed_at').
+ * @param {string} [sortHow='asc'] - The direction to sort the results ('asc' or 'desc').
+ * @param {string|null} [accessToken=null] - The access token for authenticating the API request.
+ * @returns {Array<Object>} The data fetched from Trakt API, sorted if a sort field is specified.
+ * @description
+ *   - The function will fetch data from the Trakt API, supporting pagination and optional sorting.
+ *   - Sorting is performed only if a valid `sortBy` argument is provided.
+ *   - It logs debug information about the API request and response process.
+ *   - The function throws an error if the API request fails.
+ */
 const fetchListItems = async (listId, type, page = 1, limit = 20, sortBy = null, sortHow = 'asc', accessToken = null) => {
     const endpoint = `/lists/${listId}/items/movies,shows`;
 
@@ -440,6 +596,21 @@ const fetchListItems = async (listId, type, page = 1, limit = 20, sortBy = null,
     }
 };
 
+/**
+ * Fetch trending items from the API based on the specified type and filters.
+ * @example
+ * sync('movie', 2, 10, 'action')
+ * // returns an array of trending movies for page 2 with a limit of 10 items per page and filtered by 'action' genre
+ * @param {string} type - The media type to fetch trending items for ('movie' or 'series').
+ * @param {number} [page=1] - The page number of results to retrieve.
+ * @param {number} [limit=20] - The number of items per page.
+ * @param {string|null} [genre=null] - Optional genre filter for the results.
+ * @returns {Promise<Object>} A promise resolving to the fetched trending data.
+ * @description
+ *   - Converts type 'movie' to 'movies' and 'series' to 'shows' for the endpoint.
+ *   - Logs debug information for each API call attempt and success.
+ *   - Logs error information and re-throws the error if the fetch operation fails.
+ */
 const fetchTrendingItems = async (type, page = 1, limit = 20, genre = null) => {
     const convertedType = type === 'movie' ? 'movies' : type === 'series' ? 'shows' : type;
     const endpoint = `/${convertedType}/trending`;
@@ -459,6 +630,21 @@ const fetchTrendingItems = async (type, page = 1, limit = 20, genre = null) => {
     }
 };
 
+/**
+* Fetches a list of popular films or series from the API based on the specified type, pagination, and genre.
+* @example
+* sync('movie', 1, 20, 'action')
+* // Returns a list of popular action movies.
+* @param {string} type - The type of content to fetch, either 'movie' or 'series'.
+* @param {number} [page=1] - The page number for pagination.
+* @param {number} [limit=20] - The number of items to fetch per page.
+* @param {string|null} [genre=null] - The genre of content to filter by.
+* @returns {Promise<Object>} The fetched popular items data from the API.
+* @description
+*   - Converts 'movie' to 'movies' and 'series' to 'shows' to match the API endpoint paths.
+*   - Appends a 'genre' parameter to the request only if it is provided.
+*   - Logs the request and response for debugging, and handles errors by logging and throwing them.
+*/
 const fetchPopularItems = async (type, page = 1, limit = 20, genre = null) => {
     const convertedType = type === 'movie' ? 'movies' : type === 'series' ? 'shows' : type;
     const endpoint = `/${convertedType}/popular`;
@@ -478,6 +664,18 @@ const fetchPopularItems = async (type, page = 1, limit = 20, genre = null) => {
     }
 };
 
+/**
+* Fetches the access token for a given username.
+* @example
+* sync('john_doe')
+* 'sample_access_token'
+* @param {string} username - The username for which to retrieve the access token.
+* @returns {string} The access token associated with the given username.
+* @description
+*   - This function interacts with a SQL database to fetch the access token.
+*   - If no access token is found, it throws an error.
+*   - Errors are logged before being thrown.
+*/
 const getAccessTokenForUser = async (username) => {
     try {
         const query = 'SELECT access_token FROM trakt_tokens WHERE username = $1';
@@ -494,6 +692,21 @@ const getAccessTokenForUser = async (username) => {
     }
 };
 
+/**
+* Fetch the user's watchlist from the Trakt API based on specified type, page, and limit.
+* @example
+* sync('john_doe', 'series', 2, 10)
+* Returns a list of watchlist items for the user 'john_doe' for series type on page 2 with a limit of 10 items.
+* @param {string} username - The username of the user whose watchlist is being fetched.
+* @param {string} [type='movie'] - The type of watchlist to fetch, either 'movie' or 'series'. Defaults to 'movie'.
+* @param {number} [page=1] - The page of the watchlist to fetch. Defaults to 1.
+* @param {number} [limit=20] - The number of items to fetch per page. Defaults to 20.
+* @returns {Promise<Object>} An object containing the user's watchlist data.
+* @description
+*   - Converts the single 'type' into plural form for the API endpoint: 'movie' becomes 'movies' and 'series' becomes 'shows'.
+*   - Utilizes an access token specific to the user to authenticate the API request.
+*   - Logs the operation's progress and errors to help with debugging.
+*/
 const fetchWatchlistItems = async (username, type = 'movie', page = 1, limit = 20) => {
     try {
         const accessToken = await getAccessTokenForUser(username);
@@ -514,6 +727,22 @@ const fetchWatchlistItems = async (username, type = 'movie', page = 1, limit = 2
     }
 };
 
+/**
+* Fetches recommendations based on user preferences and type
+* @example
+* sync('john_doe', 'movies')
+* // Returns a list of recommended movies for user 'john_doe'
+* @param {string} username - The username for which to fetch recommendations.
+* @param {string} [type='movies'] - The type of recommendations to fetch, either 'movies' or 'series'. Default is 'movies'.
+* @param {boolean} [ignoreCollected=true] - Whether to exclude already collected items from recommendations. Default is true.
+* @param {boolean} [ignoreWatchlisted=true] - Whether to exclude watchlisted items from recommendations. Default is true.
+* @returns {Promise<object>} The recommended items data.
+* @description
+*   - Converts 'movie' to 'movies' and 'series' to 'shows' to ensure compatibility with API endpoint.
+*   - Uses an access token specific to the user for API authentication.
+*   - Logs the recommendation fetch process for debugging purposes.
+*   - Throws an error with a message if fetching fails.
+*/
 const fetchRecommendations = async (username, type = 'movies', ignoreCollected = true, ignoreWatchlisted = true) => {
     try {
         const accessToken = await getAccessTokenForUser(username);
@@ -538,6 +767,18 @@ const fetchRecommendations = async (username, type = 'movies', ignoreCollected =
     }
 };
 
+/**
+* Retrieves and returns genre data from a specified endpoint based on type
+* @example
+* sync('movies')
+* // Returns an array of movie genres
+* @param {string} type - The type of genres to fetch (e.g., 'movies', 'shows').
+* @returns {Promise<object>} A promise that resolves to the genre data.
+* @description
+*   - Utilizes the fetchData function to request genres from a constructed endpoint.
+*   - Logs the retrieval process and handles potential errors by logging them.
+*   - Throws the error to be handled by the caller if genre data cannot be fetched.
+*/
 const fetchGenres = async (type) => {
     const endpoint = `/genres/${type}`;
   
@@ -551,6 +792,19 @@ const fetchGenres = async (type) => {
     }
   };
 
+/**
+* Inserts multiple genres into the database for a specified media type
+* @example
+* sync([{slug: 'action', name: 'Action'}, {slug: 'comedy', name: 'Comedy'}], 'movie')
+* // Commits transaction and logs success message
+* @param {Array<Object>} genres - Array of genre objects, each containing slug and name.
+* @param {String} mediaType - The type of media associated with the genres.
+* @returns {Promise<void>} Returns a promise that resolves when operation is complete.
+* @description
+*   - Begins a transaction before inserting genres and commits upon success.
+*   - Rolls back the transaction in case of an error and logs the error message.
+*   - Uses a connection pool to manage database connections efficiently.
+*/
 const storeGenresInDb = async (genres, mediaType) => {
     const client = await pool.connect();
     try {
@@ -577,6 +831,18 @@ const storeGenresInDb = async (genres, mediaType) => {
     }
 };
 
+/**
+* Fetches movie and show genres from an external source and stores them in a database
+* @example
+* sync()
+* undefined
+* @param {None} - No parameters are passed to this function.
+* @returns {Promise<void>} Promise that resolves when genres are fetched and stored.
+* @description
+*   - Fetches genres specifically for movies and shows.
+*   - Stores the fetched genres into a database, categorizing them as 'movie' or 'series'.
+*   - Logs information and error messages accordingly.
+*/
 const fetchAndStoreGenres = async () => {
     try {
         const movieGenres = await fetchGenres('movies');

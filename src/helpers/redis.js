@@ -45,6 +45,19 @@ redisClient.connect().catch((err) => {
     redisUnavailable = true;
 });
 
+/**
+* Performs a synchronous Redis cache operation.
+* @example
+* sync('set', 'key', 'value')
+* 'OK'
+* @param {string} operation - The Redis operation to perform.
+* @param {...*} args - The arguments to pass to the Redis operation.
+* @returns {Promise<*>|null} The result of the Redis operation or null if Redis is unavailable.
+* @description
+*   - Logs a warning if Redis is unavailable and skips the operation.
+*   - Tries to execute the specified Redis operation and catches errors.
+*   - Marks Redis as unavailable if an operation error occurs and logs the error message.
+*/
 const safeRedisCall = async (operation, ...args) => {
     if (redisUnavailable) {
         log.warn('Redis is unavailable, skipping cache operation.');

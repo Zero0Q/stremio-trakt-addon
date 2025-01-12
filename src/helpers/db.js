@@ -12,6 +12,19 @@ const pool = new Pool({
     connectionTimeoutMillis: process.env.DB_CONNECTION_TIMEOUT,
 });
 
+/**
+* Executes a set of SQL commands to create tables.
+* @example
+* sync('CREATE TABLE users (id INT);')
+* undefined
+* @param {string} createTableSQL - A semicolon-separated string of SQL commands to execute.
+* @returns {Promise<void>} Resolves when all commands have been executed.
+* @description
+*   - Establishes a connection with the database using a connection pool.
+*   - Logs whether each table is created or already exists.
+*   - Ensures that the database connection is released back to the pool after execution.
+*   - Catches and logs any errors that occur during query execution.
+*/
 const createDatabaseAndTable = async (createTableSQL) => {
     let client;
     try {
