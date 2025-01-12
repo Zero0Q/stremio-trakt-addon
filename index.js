@@ -18,4 +18,7 @@ app.use('/', routes);
 
 app.listen(PORT, () => {
     log.info(`Server running on port ${PORT} - Environment: ${process.env.NODE_ENV || 'development'}`);
+    } else {
+        console.log(`App running on https://stremio-trakt-dddon-5b1d9b989d0b.herokuapp.com`);
+    }
 });
