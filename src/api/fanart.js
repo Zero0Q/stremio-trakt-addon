@@ -1,6 +1,21 @@
 const axios = require('axios');
 const log = require('../helpers/logger');
 
+/**
+* Fetches the best movie logo URL from Fanart.tv in the preferred language or English if unavailable.
+* @example
+* sync('123456', 'es', 'yourFanartApiKey')
+* 'https://example.com/logo.png'
+* @param {string} tmdbId - The TMDB ID of the movie.
+* @param {string} preferredLang - The preferred language for the logos.
+* @param {string} fanartApiKey - The API key for accessing the Fanart.tv service.
+* @returns {string} URL of the best logo image, or an empty string if no logos are found.
+* @description
+*   - Uses axios to perform HTTP requests to the Fanart.tv API.
+*   - Prioritizes logos in the specified preferred language, falling back to English logos if none are found.
+*   - Logos are sorted by the number of likes to determine the 'best' one.
+*   - Ensures all returned URLs use HTTPS.
+*/
 const getFanartLogo = async (tmdbId, preferredLang, fanartApiKey) => {
     try {
         const url = `https://webservice.fanart.tv/v3/movies/${tmdbId}/?api_key=${fanartApiKey}`;

@@ -10,6 +10,17 @@ const generateRedisKey = (tmdbId, type, language) => {
     return `tmdb:${type}:${tmdbId}:${language}`;
 };
 
+/**
+* Converts a runtime in minutes to a formatted string.
+* @example
+* formatRuntime(125)
+* "2h05"
+* @param {number} runtime - The runtime in minutes to be formatted.
+* @returns {string|null} The formatted runtime string, or null if runtime is not provided.
+* @description
+*   - Formats single-digit minutes to two digits.
+*   - Handles cases where only hours or only minutes are present.
+*/
 const formatRuntime = (runtime) => {
     if (!runtime) return null;
 
@@ -25,6 +36,22 @@ const formatRuntime = (runtime) => {
     }
 };
 
+/**
+* Fetches and caches data from TMDB based on the provided parameters and synchronization settings.
+* @example
+* sync(12345, 'movie', 'your_tmdb_api_key')
+* Returns an object with movie data including title, poster, and release date.
+* @param {number} tmdbId - The TMDB ID of the media (movie or show).
+* @param {string} type - The type of the media, either 'movie' or 'tv'.
+* @param {string} tmdbApiKey - The API key to authenticate with TMDB.
+* @param {string} [language='en-US'] - The language code to fetch data in.
+* @returns {Object} Returns an object containing media details such as title, poster, description, release date, last air date, IMDb rating, genres, and runtime.
+* @description
+*   - Attempts to retrieve data from cache before making an API call to reduce latency and load.
+*   - Caches API responses with a configurable expiration to ensure updated information is fetched periodically.
+*   - Handles and logs errors during data retrieval for better debugging and monitoring.
+*   - Formats and organizes API data into a consistent structure for easy consumption.
+*/
 const getMetadataByTmdbId = async (tmdbId, type, tmdbApiKey, language = 'en-US') => {
     const redisKey = generateRedisKey(tmdbId, type, language);
     const endpoint = `${TMDB_BASE_URL}/${type}/${tmdbId}?language=${language}&api_key=${tmdbApiKey}`;
