@@ -8,7 +8,7 @@ services:
       - "8080:7000"
     environment:
       PORT: 7000
-      BASE_URL: http://localhost:7000
+      BASE_URL: https://stremio-trakt-dddon-5b1d9b989d0b.herokuapp.com
       DB_USER: postgres_user
       DB_HOST: stremio_postgres
       DB_NAME: stremio_trakt_db
